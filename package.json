@@ -1,0 +1,7 @@
+{
+  "name": "cpi-pipeline",
+  "version": "1.0.0",
+  "scripts": {
+    "validate": "echo \"🔍 Validating CPI Artifacts...\" && for f in $(find iflows -name '*.zip'); do echo Checking $f; unzip -t $f || exit 1; done && echo \"📦 Preparing build...\" && mkdir -p build && cp -r iflows build && echo \"✅ Pipeline completed\""
+  }
+}
