@@ -1,6 +1,7 @@
 {
   "name": "cpi-pipeline",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "scripts": {
-    "build": "echo \"Detecting changed files...\" && FILE=$(git diff --name-only HEAD~1 HEAD | grep '.zip') && echo \"Processing $FILE\" && unzip -t \"$FILE\" && mkdir -p build && cp \"$FILE\" build/ && echo \"✅ Done\""
+    "build": "echo \"🔍 Validating CPI Artifacts...\" && FILE=$(git diff --name-only HEAD~1 HEAD | grep '.zip') && echo \"Processing $FILE\" && unzip -t \"$FILE\" && mkdir -p build && cp \"$FILE\" build/ && echo \"✅ Done\""
   }
+}
