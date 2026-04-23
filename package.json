@@ -2,6 +2,5 @@
   "name": "cpi-pipeline",
   "version": "1.0.0",
   "scripts": {
-    "validate": "echo \"🔍 Validating CPI Artifacts...\" && for f in $(find iflows -name '*.zip'); do echo Checking $f; unzip -t $f || exit 1; done && echo \"📦 Preparing build...\" && mkdir -p build && cp -r iflows build && echo \"✅ Pipeline completed\""
+    "build": "echo \"Detecting changed files...\" && FILE=$(git diff --name-only HEAD~1 HEAD | grep '.zip') && echo \"Processing $FILE\" && unzip -t \"$FILE\" && mkdir -p build && cp \"$FILE\" build/ && echo \"✅ Done\""
   }
-}
