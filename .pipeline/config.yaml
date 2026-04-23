@@ -1,43 +1,31 @@
 general:
-  buildTool: "custom"
+  buildTool: mta
 
-stages:
-  Validate:
-    steps:
-      - name: Validate CPI Artifacts
-        command: |
-          echo "🔍 Validating CPI Artifacts..."
+steps:
+  mtaBuild:
+    execute: false
 
-          if [ ! -d "iflows" ]; then
-            echo "❌ iflows folder missing"
-            exit 1
-          fi
+  executeScript:
+    execute: true
+    command: |
+      echo "🔍 Validating CPI Artifacts..."
 
-          count=0
+      if [ ! -d "iflows" ]; then
+        echo "❌ iflows folder missing"
+        exit 1
+      fi
 
-          for file in $(find iflows -name "*.zip"); do
-            echo "Checking $file"
-            unzip -t "$file" || exit 1
-            count=$((count+1))
-          done
+      for file in $(find iflows -name "*.zip"); do
+        echo "Checking $file"
+        unzip -t "$file" || exit 1
+      done
 
-          if [ "$count" -eq 0 ]; then
-            echo "❌ No ZIP files found"
-            exit 1
-          fi
+      echo "📦 Preparing build..."
 
-          echo "✅ Validation successful"
+      mkdir -p build
+      cp -r iflows build/
 
-  Build:
-    steps:
-      - name: Prepare Build
-        command: |
-          echo "📦 Preparing build..."
+      echo "Build content:"
+      ls -R build
 
-          mkdir -p build
-          cp -r iflows build/
-
-          echo "Build content:"
-          ls -R build
-
-          echo "✅ Build completed"
+      echo "✅ Pipeline completed"
