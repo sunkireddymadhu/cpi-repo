@@ -1,0 +1,7 @@
+general:
+  buildTool: npm
+
+steps:
+  npmExecuteScripts:
+    runScripts:
+      - build
