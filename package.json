@@ -2,6 +2,6 @@
   "name": "cpi-pipeline",
   "version": "1.0.1",
   "scripts": {
-    "build": "echo \"🔍 Validating CPI Artifacts...\" && FILE=$(find iflows -name '*.zip' | sort -V | tail -1) && BASENAME=$(basename $FILE) && echo \"Processing $FILE\" && unzip -t \"$FILE\" && mkdir -p dist && cp \"$FILE\" dist/$BASENAME && echo \"USER=$nexus_usr\" && echo \"📦 Uploading to Nexus...\" && curl -v -u $nexus_usr$nexus_psw -T dist/$BASENAME $ARTIFACT_URL/$BASENAME && echo \"✅ Uploaded Successfully\""
+    "build": "echo \"🔍 Validating CPI Artifacts...\" && FILE=$(find iflows -name '*.zip' | sort -V | tail -1) && BASENAME=$(basename \"$FILE\") && echo \"Processing $FILE\" && unzip -t \"$FILE\" && mkdir -p dist && cp \"$FILE\" \"dist/$BASENAME\" && echo \"USER=$nexus_usr\" && echo \"📦 Uploading to Nexus...\" && curl -v -u \"$nexus_usr:$nexus_psw\" -T \"dist/$BASENAME\" \"$ARTIFACT_URL/$BASENAME\" && echo \"✅ Uploaded Successfully\""
   }
 }
