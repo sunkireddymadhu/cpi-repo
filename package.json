@@ -2,6 +2,7 @@
   "name": "cpi-pipeline",
   "version": "1.0.1",
   "scripts": {
-    "build": "echo \"🔍 Validating CPI Artifacts...\" && FILE=$(find iflows -name '*.zip' | sort -V | tail -1) && BASENAME=$(basename \"$FILE\") && echo \"Processing $FILE\" && unzip -t \"$FILE\" && mkdir -p dist && cp \"$FILE\" \"dist/$BASENAME\" && echo \"USER=$nexus_usr\" && echo \"📦 Uploading to Nexus...\" && curl -v -u \"$nexus_usr:$nexus_psw\" -T \"dist/$BASENAME\" \"$ARTIFACT_URL/$BASENAME\" && echo \"✅ Uploaded Successfully\""
+    "build": "sh -ec 'echo \"Validating CPI artifacts...\"; FILE=$(find iflows -name \"*.zip\" | sort -V | tail -1); test -n \"$FILE\"; BASENAME=$(basename \"$FILE\"); echo \"Processing $FILE\"; unzip -t \"$FILE\"; mkdir -p dist; cp \"$FILE\" \"dist/$BASENAME\"; NEXUS_USER=\"$nexus_usr\"; NEXUS_PASS=\"${nexus_psw:-$nexus_password}\"; echo \"nexus_usr set? ${NEXUS_USER:+yes}\"; echo \"nexus password set? ${NEXUS_PASS:+yes}\"; echo \"Uploading to Nexus...\"; test -n \"$NEXUS_USER\"; test -n \"$NEXUS_PASS\"; test -n \"$ARTIFACT_URL\"; curl --fail --show-error --silent -u \"$NEXUS_USER:$NEXUS_PASS\" -T \"dist/$BASENAME\" \"$ARTIFACT_URL/$BASENAME\"; echo \"Uploaded successfully\"'"
   }
 }
+
