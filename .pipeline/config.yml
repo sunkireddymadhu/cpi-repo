@@ -5,3 +5,6 @@ steps:
   npmExecuteScripts:
     runScripts:
       - build
+
+  npmExecuteScripts:
+      runScripts: "deploy"
