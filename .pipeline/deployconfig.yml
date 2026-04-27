@@ -6,10 +6,6 @@ steps:
     enabled: false
 
 stages:
-  Build:
-    npmExecuteScripts:
-      runScripts: "build"
-
   Deploy:
     npmExecuteScripts:
       runScripts: "deploy"
