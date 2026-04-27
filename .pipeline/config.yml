@@ -2,14 +2,5 @@ general:
   buildTool: "custom"
 
 steps:
-  artifactPrepareVersion:
-    enabled: false
-
-stages:
-  Build:
-    npmExecuteScripts:
-      runScripts: "build"
-
-  Deploy:
-    npmExecuteScripts:
-      runScripts: "deploy"
+  executeScript:
+    command: "npm install && npm run $PIPELINE_MODE"
