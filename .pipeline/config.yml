@@ -6,5 +6,9 @@ steps:
     runScripts:
       - build
 
+steps:
+  artifactPrepareVersion:
+    enabled: false
+
   npmExecuteScripts:
       runScripts: "deploy"
