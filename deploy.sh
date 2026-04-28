@@ -65,21 +65,29 @@ CHECK_BODY="$TMP_DIR/check.json"
 ACTION_BODY="$TMP_DIR/action.json"
 DEPLOY_BODY="$TMP_DIR/deploy.json"
 STATUS_BODY="$TMP_DIR/status.json"
+COOKIE_JAR="$TMP_DIR/cookies.txt"
 
 echo "Fetching CSRF token..."
 CSRF_URL="$BASE_URL/IntegrationDesigntimeArtifacts?\$top=1"
 echo "Resolved CSRF URL: $CSRF_URL"
 
-curl --fail --show-error --silent \
+HTTP_CODE="$(curl --silent --show-error \
   -D "$CSRF_HEADERS" \
+  -c "$COOKIE_JAR" \
+  -b "$COOKIE_JAR" \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "X-CSRF-Token: Fetch" \
   -H "Accept: application/json" \
-  "$CSRF_URL" \
-  -o /dev/null
+  -o /dev/null \
+  -w "%{http_code}" \
+  "$CSRF_URL")"
 
+echo "CSRF fetch HTTP code: $HTTP_CODE"
+echo "CSRF response headers:"
+cat "$CSRF_HEADERS"
 
 CSRF_TOKEN="$(awk 'BEGIN{IGNORECASE=1} /^X-CSRF-Token:/ {sub(/\r$/, "", $2); print $2}' "$CSRF_HEADERS" | tail -1)"
+
 if [ -z "$CSRF_TOKEN" ]; then
   echo "Failed to fetch CSRF token." >&2
   exit 1
@@ -107,6 +115,8 @@ if [ "$HTTP_CODE" = "200" ]; then
   echo "iFlow exists. Updating design-time artifact..."
   curl --fail --show-error --silent \
     -X PUT \
+    -c "$COOKIE_JAR" \
+    -b "$COOKIE_JAR" \
     -H "Authorization: Bearer $ACCESS_TOKEN" \
     -H "X-CSRF-Token: $CSRF_TOKEN" \
     -H "Accept: application/json" \
@@ -118,6 +128,8 @@ elif [ "$HTTP_CODE" = "404" ]; then
   echo "iFlow does not exist. Creating design-time artifact..."
   curl --fail --show-error --silent \
     -X POST \
+    -c "$COOKIE_JAR" \
+    -b "$COOKIE_JAR" \
     -H "Authorization: Bearer $ACCESS_TOKEN" \
     -H "X-CSRF-Token: $CSRF_TOKEN" \
     -H "Accept: application/json" \
@@ -133,23 +145,36 @@ fi
 
 echo "Triggering deployment..."
 curl --fail --show-error --silent \
+  -X POST \
+  -c "$COOKIE_JAR" \
+  -b "$COOKIE_JAR" \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "X-CSRF-Token: $CSRF_TOKEN" \
   -H "Accept: application/json" \
+  "$DEPLOY_URL" \
+  -o "$DEPLOY_BODY"
 
+TASK_ID="$(printf '%s' "$(cat "$DEPLOY_BODY")" | extract_json_value TaskId)"
 
+if [ -z "$TASK_ID" ]; then
+  echo "Failed to read deployment task id." >&2
+  cat "$DEPLOY_BODY" >&2
+  exit 1
 fi
 
+STATUS_URL="$BASE_URL/BuildAndDeployStatus(TaskId='$TASK_ID')"
+echo "Polling deployment task: $TASK_ID"
+
+attempt=1
 while [ "$attempt" -le 30 ]; do
   curl --fail --show-error --silent \
+    -H "Authorization: Bearer $ACCESS_TOKEN" \
     -H "Accept: application/json" \
     "$STATUS_URL" \
     -o "$STATUS_BODY"
-    -H "Authorization: Bearer $ACCESS_TOKEN" \
-
-attempt=1
 
   STATUS="$(printf '%s' "$(cat "$STATUS_BODY")" | node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync(0,'utf8')); const status=data.Status || (data.d && data.d.Status) || ''; process.stdout.write(String(status));")"
+
   if [ "$STATUS" = "SUCCESS" ]; then
     echo "Deployment successful"
     exit 0
@@ -157,26 +182,16 @@ attempt=1
 
   if [ "$STATUS" = "ERROR" ] || [ "$STATUS" = "FAIL" ] || [ "$STATUS" = "FAILED" ]; then
     echo "Deployment failed with status: $STATUS" >&2
+    cat "$STATUS_BODY" >&2
     exit 1
   fi
 
   echo "Deployment status attempt $attempt/30: ${STATUS:-pending}"
   attempt=$((attempt + 1))
   sleep 10
+done
 
 echo "Deployment timed out." >&2
 cat "$STATUS_BODY" >&2
 exit 1
-done
-    cat "$STATUS_BODY" >&2
-
-echo "Polling deployment task: $TASK_ID"
-STATUS_URL="$BASE_URL/BuildAndDeployStatus(TaskId='$TASK_ID')"
-if [ -z "$TASK_ID" ]; then
-  echo "Failed to read deployment task id." >&2
-  exit 1
-  cat "$DEPLOY_BODY" >&2
-TASK_ID="$(printf '%s' "$(cat "$DEPLOY_BODY")" | extract_json_value TaskId)"
-  -o "$DEPLOY_BODY"
-  "$DEPLOY_URL" \
 
