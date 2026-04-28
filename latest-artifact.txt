@@ -1,1 +1,1 @@
-iflows/IF_Persist_Service1/v1.0.7/IF_Persist_Service1_v1.0.7.zip
+iflows/IF_Notification_Service1/v1.0.8/IF_Notification_Service1_v1.0.8.zip

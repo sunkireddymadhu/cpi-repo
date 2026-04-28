@@ -1,9 +1,9 @@
-#!/bin/sh
-set -eu
+#!/bin/bash
+set -euo pipefail
 
 require_env() {
-  var_name="$1"
-  eval "value=\${$var_name:-}"
+  local var_name="$1"
+  local value="${!var_name:-}"
   if [ -z "$value" ]; then
     echo "Missing required environment variable: $var_name" >&2
     exit 1
@@ -11,12 +11,11 @@ require_env() {
 }
 
 extract_json_value() {
-  json_key="$1"
-  node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync(0,'utf8')); const value=data[process.argv[1]] || (data.d && data.d[process.argv[1]]); if (!value) process.exit(1); process.stdout.write(String(value));" "$json_key"
+  local json_key="$1"
+  node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync(0,'utf8')); const value=data[process.argv[1]] || ''; if (!value) process.exit(1); process.stdout.write(String(value));" "$json_key"
 }
 
 require_env NEXUS_REPOSITORY_URL
-require_env NEXUS_ARTIFACT_NAME
 require_env NEXUS_USER
 require_env NEXUS_PASSWORD
 require_env CPI_TOKEN_URL
@@ -27,8 +26,24 @@ require_env CPI_IFLOW_ID
 require_env CPI_PACKAGE_ID
 require_env CPI_IFLOW_NAME
 
-ARTIFACT_FILE="$NEXUS_ARTIFACT_NAME"
-NEXUS_DOWNLOAD_URL="${NEXUS_REPOSITORY_URL%/}/$NEXUS_ARTIFACT_NAME"
+REQUEST_FILE="deploy-request.json"
+
+[ -f "$REQUEST_FILE" ] || { echo "deploy-request.json not found"; exit 1; }
+
+ARTIFACT_ID="$(cat "$REQUEST_FILE" | extract_json_value artifactId)"
+ARTIFACT_VERSION="$(cat "$REQUEST_FILE" | extract_json_value version)"
+
+[ -n "$ARTIFACT_ID" ] || { echo "artifactId missing in deploy-request.json"; exit 1; }
+[ -n "$ARTIFACT_VERSION" ] || { echo "version missing in deploy-request.json"; exit 1; }
+
+ARTIFACT_NAME="${ARTIFACT_ID}_v${ARTIFACT_VERSION}.zip"
+ARTIFACT_FILE="$ARTIFACT_NAME"
+NEXUS_DOWNLOAD_URL="${NEXUS_REPOSITORY_URL%/}/$ARTIFACT_ID/$ARTIFACT_VERSION/$ARTIFACT_NAME"
+
+echo "Resolved artifact id: $ARTIFACT_ID"
+echo "Resolved artifact version: $ARTIFACT_VERSION"
+echo "Resolved artifact name: $ARTIFACT_NAME"
+echo "Nexus download URL: $NEXUS_DOWNLOAD_URL"
 
 echo "Downloading artifact from Nexus..."
 curl --fail --show-error --silent --location \
@@ -69,7 +84,6 @@ COOKIE_JAR="$TMP_DIR/cookies.txt"
 
 echo "Fetching CSRF token..."
 CSRF_URL="$BASE_URL/IntegrationDesigntimeArtifacts?\$top=1"
-echo "Resolved CSRF URL: $CSRF_URL"
 
 HTTP_CODE="$(curl --silent --show-error \
   -D "$CSRF_HEADERS" \
@@ -83,13 +97,12 @@ HTTP_CODE="$(curl --silent --show-error \
   "$CSRF_URL" || true)"
 
 echo "CSRF fetch HTTP code: $HTTP_CODE"
-echo "CSRF response headers:"
-cat "$CSRF_HEADERS"
 
 CSRF_TOKEN="$(awk 'BEGIN{IGNORECASE=1} /^x-csrf-token:/ {sub(/\r$/, "", $2); print $2}' "$CSRF_HEADERS" | tail -1)"
 
 if [ -z "$CSRF_TOKEN" ]; then
   echo "Failed to fetch CSRF token." >&2
+  cat "$CSRF_HEADERS" >&2
   exit 1
 fi
 
@@ -97,11 +110,6 @@ CHECK_URL="$BASE_URL/IntegrationDesigntimeArtifacts(Id='$CPI_IFLOW_ID',Version='
 UPDATE_URL="$CHECK_URL"
 CREATE_URL="$BASE_URL/IntegrationDesigntimeArtifacts"
 DEPLOY_URL="$BASE_URL/DeployIntegrationDesigntimeArtifact?Id='$CPI_IFLOW_ID'&Version='active'"
-
-echo "Resolved check URL: $CHECK_URL"
-echo "Resolved create URL: $CREATE_URL"
-echo "Resolved update URL: $UPDATE_URL"
-echo "Resolved deploy URL: $DEPLOY_URL"
 
 echo "Checking whether iFlow exists..."
 HTTP_CODE="$(curl --silent --show-error \

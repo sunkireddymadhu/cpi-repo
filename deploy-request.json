@@ -1,0 +1,8 @@
+app.post('/deploy-request', async (req, res) => {
+  const { artifactId, version } = req.body;
+
+  // validate
+  // write deploy-request.json
+  // git add/commit/push
+  // trigger SAP CI/CD deploy job
+});
