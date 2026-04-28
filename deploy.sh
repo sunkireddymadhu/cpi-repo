@@ -63,7 +63,7 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 CSRF_HEADERS="$TMP_DIR/csrf-headers.txt"
 CHECK_BODY="$TMP_DIR/check.json"
 ACTION_BODY="$TMP_DIR/action.json"
-DEPLOY_BODY="$TMP_DIR/deploy.json"
+DEPLOY_BODY="$TMP_DIR/deploy.txt"
 STATUS_BODY="$TMP_DIR/status.json"
 COOKIE_JAR="$TMP_DIR/cookies.txt"
 
@@ -154,7 +154,7 @@ curl --fail --show-error --silent \
   "$DEPLOY_URL" \
   -o "$DEPLOY_BODY"
 
-TASK_ID="$(printf '%s' "$(cat "$DEPLOY_BODY")" | extract_json_value TaskId)"
+TASK_ID="$(tr -d '\r\n\"' < "$DEPLOY_BODY")"
 
 if [ -z "$TASK_ID" ]; then
   echo "Failed to read deployment task id." >&2
