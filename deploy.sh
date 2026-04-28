@@ -11,8 +11,8 @@ require_env() {
 }
 
 extract_json_value() {
-  key="$1"
-  node -e "const fs = require('fs'); const payload = fs.readFileSync(0, 'utf8'); const data = JSON.parse(payload); const value = data[key]; if (!value) process.exit(1); process.stdout.write(String(value));"
+  json_key="$1"
+  node -e "const fs = require('fs'); const payload = fs.readFileSync(0, 'utf8'); const data = JSON.parse(payload); const value = data[process.argv[1]]; if (!value) process.exit(1); process.stdout.write(String(value));" "$json_key"
 }
 
 require_env NEXUS_REPOSITORY_URL
@@ -46,6 +46,11 @@ TOKEN_RESPONSE="$(curl --fail --show-error --silent \
 
 ACCESS_TOKEN="$(printf '%s' "$TOKEN_RESPONSE" | extract_json_value access_token)"
 
+if [ -z "$ACCESS_TOKEN" ]; then
+  echo "Unable to read access token from CPI token response." >&2
+  exit 1
+fi
+
 BASE_URL="${CPI_RUNTIME_URL%/}"
 case "$BASE_URL" in
   */api/v1) ;;
@@ -76,3 +81,5 @@ curl --fail --show-error --silent \
   "$DEPLOY_URL"
 
 echo "Deployment successful"
+
+
