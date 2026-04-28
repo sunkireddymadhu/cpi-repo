@@ -12,7 +12,7 @@ require_env() {
 
 extract_json_value() {
   json_key="$1"
-  node -e "const fs = require('fs'); const payload = fs.readFileSync(0, 'utf8'); const data = JSON.parse(payload); const value = data[process.argv[1]]; if (!value) process.exit(1); process.stdout.write(String(value));" "$json_key"
+  node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync(0,'utf8')); const value=data[process.argv[1]] || (data.d && data.d[process.argv[1]]); if (!value) process.exit(1); process.stdout.write(String(value));" "$json_key"
 }
 
 require_env NEXUS_REPOSITORY_URL
@@ -24,6 +24,8 @@ require_env CPI_CLIENT_ID
 require_env CPI_CLIENT_SECRET
 require_env CPI_RUNTIME_URL
 require_env CPI_IFLOW_ID
+require_env CPI_PACKAGE_ID
+require_env CPI_IFLOW_NAME
 
 ARTIFACT_FILE="$NEXUS_ARTIFACT_NAME"
 NEXUS_DOWNLOAD_URL="${NEXUS_REPOSITORY_URL%/}/$NEXUS_ARTIFACT_NAME"
@@ -37,6 +39,9 @@ curl --fail --show-error --silent --location \
 echo "Validating artifact..."
 unzip -t "$ARTIFACT_FILE" >/dev/null
 
+echo "Encoding artifact..."
+ARTIFACT_B64="$(base64 -w 0 "$ARTIFACT_FILE" 2>/dev/null || base64 "$ARTIFACT_FILE" | tr -d '\n')"
+
 echo "Requesting CPI access token..."
 TOKEN_RESPONSE="$(curl --fail --show-error --silent \
   -u "$CPI_CLIENT_ID:$CPI_CLIENT_SECRET" \
@@ -46,11 +51,6 @@ TOKEN_RESPONSE="$(curl --fail --show-error --silent \
 
 ACCESS_TOKEN="$(printf '%s' "$TOKEN_RESPONSE" | extract_json_value access_token)"
 
-if [ -z "$ACCESS_TOKEN" ]; then
-  echo "Unable to read access token from CPI token response." >&2
-  exit 1
-fi
-
 BASE_URL="${CPI_RUNTIME_URL%/}"
 case "$BASE_URL" in
   */api/v1) ;;
@@ -58,28 +58,121 @@ case "$BASE_URL" in
   *) BASE_URL="$BASE_URL/api/v1" ;;
 esac
 
-UPLOAD_URL="$BASE_URL/IntegrationDesigntimeArtifacts"
-DEPLOY_URL="$BASE_URL/IntegrationRuntimeArtifacts('$CPI_IFLOW_ID')/Start"
+TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "$TMP_DIR"' EXIT
+CSRF_HEADERS="$TMP_DIR/csrf-headers.txt"
+CHECK_BODY="$TMP_DIR/check.json"
+ACTION_BODY="$TMP_DIR/action.json"
+DEPLOY_BODY="$TMP_DIR/deploy.json"
+STATUS_BODY="$TMP_DIR/status.json"
 
-echo "Resolved upload URL: $UPLOAD_URL"
+echo "Fetching CSRF token..."
+curl --fail --show-error --silent \
+  -D "$CSRF_HEADERS" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "X-CSRF-Token: Fetch" \
+  -H "Accept: application/json" \
+  "$BASE_URL/IntegrationPackages?\$top=1" \
+  -o /dev/null
+
+CSRF_TOKEN="$(awk 'BEGIN{IGNORECASE=1} /^X-CSRF-Token:/ {sub(/\r$/, "", $2); print $2}' "$CSRF_HEADERS" | tail -1)"
+if [ -z "$CSRF_TOKEN" ]; then
+  echo "Failed to fetch CSRF token." >&2
+  exit 1
+fi
+
+CHECK_URL="$BASE_URL/IntegrationDesigntimeArtifacts(Id='$CPI_IFLOW_ID',Version='active')"
+UPDATE_URL="$CHECK_URL"
+CREATE_URL="$BASE_URL/IntegrationDesigntimeArtifacts"
+DEPLOY_URL="$BASE_URL/DeployIntegrationDesigntimeArtifact?Id='$CPI_IFLOW_ID'&Version='active'"
+
+echo "Resolved check URL: $CHECK_URL"
+echo "Resolved create URL: $CREATE_URL"
+echo "Resolved update URL: $UPDATE_URL"
 echo "Resolved deploy URL: $DEPLOY_URL"
 
-echo "Uploading artifact to CPI..."
-curl --fail --show-error --silent \
-  -X POST \
+echo "Checking whether iFlow exists..."
+HTTP_CODE="$(curl --silent --show-error \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Accept: application/json" \
-  -H "Content-Type: application/zip" \
-  --data-binary "@$ARTIFACT_FILE" \
-  "$UPLOAD_URL"
+  -o "$CHECK_BODY" \
+  -w "%{http_code}" \
+  "$CHECK_URL")"
 
-echo "Starting iFlow..."
+if [ "$HTTP_CODE" = "200" ]; then
+  echo "iFlow exists. Updating design-time artifact..."
+  curl --fail --show-error --silent \
+    -X PUT \
+    -H "Authorization: Bearer $ACCESS_TOKEN" \
+    -H "X-CSRF-Token: $CSRF_TOKEN" \
+    -H "Accept: application/json" \
+    -H "Content-Type: application/json" \
+    -d "{\"Name\":\"$CPI_IFLOW_NAME\",\"ArtifactContent\":\"$ARTIFACT_B64\"}" \
+    "$UPDATE_URL" \
+    -o "$ACTION_BODY"
+elif [ "$HTTP_CODE" = "404" ]; then
+  echo "iFlow does not exist. Creating design-time artifact..."
+  curl --fail --show-error --silent \
+    -X POST \
+    -H "Authorization: Bearer $ACCESS_TOKEN" \
+    -H "X-CSRF-Token: $CSRF_TOKEN" \
+    -H "Accept: application/json" \
+    -H "Content-Type: application/json" \
+    -d "{\"Id\":\"$CPI_IFLOW_ID\",\"Name\":\"$CPI_IFLOW_NAME\",\"PackageId\":\"$CPI_PACKAGE_ID\",\"ArtifactContent\":\"$ARTIFACT_B64\"}" \
+    "$CREATE_URL" \
+    -o "$ACTION_BODY"
+else
+  echo "Failed to check iFlow existence. HTTP $HTTP_CODE" >&2
+  cat "$CHECK_BODY" >&2
+  exit 1
+fi
+
+echo "Triggering deployment..."
 curl --fail --show-error --silent \
-  -X POST \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "X-CSRF-Token: $CSRF_TOKEN" \
   -H "Accept: application/json" \
-  "$DEPLOY_URL"
 
-echo "Deployment successful"
 
+fi
+
+while [ "$attempt" -le 30 ]; do
+  curl --fail --show-error --silent \
+    -H "Accept: application/json" \
+    "$STATUS_URL" \
+    -o "$STATUS_BODY"
+    -H "Authorization: Bearer $ACCESS_TOKEN" \
+
+attempt=1
+
+  STATUS="$(printf '%s' "$(cat "$STATUS_BODY")" | node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync(0,'utf8')); const status=data.Status || (data.d && data.d.Status) || ''; process.stdout.write(String(status));")"
+  if [ "$STATUS" = "SUCCESS" ]; then
+    echo "Deployment successful"
+    exit 0
+  fi
+
+  if [ "$STATUS" = "ERROR" ] || [ "$STATUS" = "FAIL" ] || [ "$STATUS" = "FAILED" ]; then
+    echo "Deployment failed with status: $STATUS" >&2
+    exit 1
+  fi
+
+  echo "Deployment status attempt $attempt/30: ${STATUS:-pending}"
+  attempt=$((attempt + 1))
+  sleep 10
+
+echo "Deployment timed out." >&2
+cat "$STATUS_BODY" >&2
+exit 1
+done
+    cat "$STATUS_BODY" >&2
+
+echo "Polling deployment task: $TASK_ID"
+STATUS_URL="$BASE_URL/BuildAndDeployStatus(TaskId='$TASK_ID')"
+if [ -z "$TASK_ID" ]; then
+  echo "Failed to read deployment task id." >&2
+  exit 1
+  cat "$DEPLOY_BODY" >&2
+TASK_ID="$(printf '%s' "$(cat "$DEPLOY_BODY")" | extract_json_value TaskId)"
+  -o "$DEPLOY_BODY"
+  "$DEPLOY_URL" \
 
