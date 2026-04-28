@@ -7,8 +7,11 @@ LATEST_FILE="latest-artifact.txt"
 
 [ -f "$LATEST_FILE" ] || { echo "latest-artifact.txt not found"; exit 1; }
 
-FILE=$(tr -d '\r' < "$LATEST_FILE")
-[ -n "$FILE" ] || { echo "latest-artifact.txt is empty"; exit 1; }
+RAW_FILE=$(tr -d '\r' < "$LATEST_FILE")
+[ -n "$RAW_FILE" ] || { echo "latest-artifact.txt is empty"; exit 1; }
+
+FILE="${RAW_FILE//\\//}"
+
 [ -f "$FILE" ] || { echo "Artifact file not found: $FILE"; exit 1; }
 
 BASENAME=$(basename "$FILE")
