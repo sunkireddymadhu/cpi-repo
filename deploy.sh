@@ -67,13 +67,17 @@ DEPLOY_BODY="$TMP_DIR/deploy.json"
 STATUS_BODY="$TMP_DIR/status.json"
 
 echo "Fetching CSRF token..."
+CSRF_URL="$BASE_URL/IntegrationDesigntimeArtifacts?\$top=1"
+echo "Resolved CSRF URL: $CSRF_URL"
+
 curl --fail --show-error --silent \
   -D "$CSRF_HEADERS" \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "X-CSRF-Token: Fetch" \
   -H "Accept: application/json" \
-  "$BASE_URL/IntegrationPackages?\$top=1" \
+  "$CSRF_URL" \
   -o /dev/null
+
 
 CSRF_TOKEN="$(awk 'BEGIN{IGNORECASE=1} /^X-CSRF-Token:/ {sub(/\r$/, "", $2); print $2}' "$CSRF_HEADERS" | tail -1)"
 if [ -z "$CSRF_TOKEN" ]; then
