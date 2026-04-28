@@ -80,13 +80,13 @@ HTTP_CODE="$(curl --silent --show-error \
   -H "Accept: application/json" \
   -o /dev/null \
   -w "%{http_code}" \
-  "$CSRF_URL")"
+  "$CSRF_URL" || true)"
 
 echo "CSRF fetch HTTP code: $HTTP_CODE"
 echo "CSRF response headers:"
 cat "$CSRF_HEADERS"
 
-CSRF_TOKEN="$(awk 'BEGIN{IGNORECASE=1} /^X-CSRF-Token:/ {sub(/\r$/, "", $2); print $2}' "$CSRF_HEADERS" | tail -1)"
+CSRF_TOKEN="$(awk 'BEGIN{IGNORECASE=1} /^x-csrf-token:/ {sub(/\r$/, "", $2); print $2}' "$CSRF_HEADERS" | tail -1)"
 
 if [ -z "$CSRF_TOKEN" ]; then
   echo "Failed to fetch CSRF token." >&2
@@ -109,7 +109,7 @@ HTTP_CODE="$(curl --silent --show-error \
   -H "Accept: application/json" \
   -o "$CHECK_BODY" \
   -w "%{http_code}" \
-  "$CHECK_URL")"
+  "$CHECK_URL" || true)"
 
 if [ "$HTTP_CODE" = "200" ]; then
   echo "iFlow exists. Updating design-time artifact..."
@@ -194,4 +194,3 @@ done
 echo "Deployment timed out." >&2
 cat "$STATUS_BODY" >&2
 exit 1
-
