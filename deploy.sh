@@ -25,9 +25,6 @@ require_env CPI_TOKEN_URL
 require_env CPI_CLIENT_ID
 require_env CPI_CLIENT_SECRET
 require_env CPI_RUNTIME_URL
-require_env CPI_IFLOW_ID
-require_env CPI_PACKAGE_ID
-require_env CPI_IFLOW_NAME
 
 REQUEST_FILE="deploy-request.json"
 
@@ -35,9 +32,14 @@ REQUEST_FILE="deploy-request.json"
 
 ARTIFACT_ID="$(cat "$REQUEST_FILE" | extract_json_value artifactId)"
 ARTIFACT_VERSION="$(cat "$REQUEST_FILE" | extract_json_value version)"
+CPI_PACKAGE_ID="$(cat "$REQUEST_FILE" | extract_json_value packageId)"
 
 [ -n "$ARTIFACT_ID" ] || { echo "artifactId missing in deploy-request.json"; exit 1; }
 [ -n "$ARTIFACT_VERSION" ] || { echo "version missing in deploy-request.json"; exit 1; }
+[ -n "$CPI_PACKAGE_ID" ] || { echo "packageId missing in deploy-request.json"; exit 1; }
+
+CPI_IFLOW_ID="$ARTIFACT_ID"
+CPI_IFLOW_NAME="$ARTIFACT_ID"
 
 ARTIFACT_NAME="${ARTIFACT_ID}_v${ARTIFACT_VERSION}.zip"
 ARTIFACT_FILE="$ARTIFACT_NAME"
@@ -46,10 +48,10 @@ NEXUS_DOWNLOAD_URL="${NEXUS_REPOSITORY_URL%/}/$ARTIFACT_ID/$ARTIFACT_VERSION/$AR
 echo "Resolved artifact id: $ARTIFACT_ID"
 echo "Resolved artifact version: $ARTIFACT_VERSION"
 echo "Resolved artifact name: $ARTIFACT_NAME"
+echo "Resolved package id: $CPI_PACKAGE_ID"
+echo "Resolved iflow id: $CPI_IFLOW_ID"
+echo "Resolved iflow name: $CPI_IFLOW_NAME"
 echo "Nexus download URL: $NEXUS_DOWNLOAD_URL"
-echo "Configured CPI_IFLOW_ID: $CPI_IFLOW_ID"
-echo "Configured CPI_IFLOW_NAME: $CPI_IFLOW_NAME"
-echo "Configured CPI_PACKAGE_ID: $CPI_PACKAGE_ID"
 
 echo "Downloading artifact from Nexus..."
 curl --fail --show-error --silent --location \
