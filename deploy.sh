@@ -113,10 +113,6 @@ if [ -z "$CSRF_TOKEN" ]; then
 fi
 
 CHECK_URL="$BASE_URL/IntegrationDesigntimeArtifacts(Id='$CPI_IFLOW_ID',Version='$ARTIFACT_VERSION')"
-<<<<<<< Updated upstream
-UPDATE_URL="$CHECK_URL"
-=======
->>>>>>> Stashed changes
 CREATE_URL="$BASE_URL/IntegrationDesigntimeArtifacts"
 DEPLOY_URL="$BASE_URL/DeployIntegrationDesigntimeArtifact?Id='$CPI_IFLOW_ID'&Version='$ARTIFACT_VERSION'"
 
@@ -134,34 +130,7 @@ cat "$CHECK_BODY"
 echo
 
 if [ "$HTTP_CODE" = "200" ]; then
-<<<<<<< Updated upstream
-  echo "Exact iFlow version exists. Updating design-time artifact..."
-  HTTP_CODE="$(curl --silent --show-error \
-    -X PUT \
-    -D "$ACTION_HEADERS" \
-    -c "$COOKIE_JAR" \
-    -b "$COOKIE_JAR" \
-    -H "Authorization: Bearer $ACCESS_TOKEN" \
-    -H "X-CSRF-Token: $CSRF_TOKEN" \
-    -H "Accept: application/json" \
-    -H "Content-Type: application/json" \
-    -d "{\"Name\":\"$CPI_IFLOW_NAME\",\"ArtifactContent\":\"$ARTIFACT_B64\"}" \
-    -o "$ACTION_BODY" \
-    -w "%{http_code}" \
-    "$UPDATE_URL" || true)"
-
-  if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
-    echo "Update failed. HTTP $HTTP_CODE" >&2
-    echo "Update response headers:" >&2
-    cat "$ACTION_HEADERS" >&2
-    echo >&2
-    echo "Update response body:" >&2
-    cat "$ACTION_BODY" >&2
-    exit 1
-  fi
-=======
   echo "Exact iFlow version already exists. Skipping update and deploying existing artifact."
->>>>>>> Stashed changes
 elif [ "$HTTP_CODE" = "404" ]; then
   echo "Exact iFlow version does not exist. Creating design-time artifact..."
   HTTP_CODE="$(curl --silent --show-error \
