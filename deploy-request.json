@@ -1,6 +1,6 @@
 {
-  "artifactId": "IF_Incident_Mgmt",
-  "version": "1.0.10",
+  "artifactId": "IF_Persist_Service",
+  "version": "1.0.7",
   "packageId": "CommonServicesFramework",
-  "requestedAt": "2026-04-29T05:43:57.580Z"
+  "requestedAt": "2026-04-29T05:51:16.143Z"
 }
