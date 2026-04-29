@@ -1,1 +1,1 @@
-iflows/IF_SelectiveMessage_Replay/v1.0.4/IF_SelectiveMessage_Replay_v1.0.4.zip
+iflows/IF_Customer_Order_Management/v1.0.11/IF_Customer_Order_Management_v1.0.11.zip
