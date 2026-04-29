@@ -15,12 +15,14 @@ extract_json_value() {
   node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync(0,'utf8')); const value=data[process.argv[1]] || ''; if (!value) process.exit(1); process.stdout.write(String(value));" "$json_key"
 }
 
-extract_existing_version() {
-  node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync(0,'utf8')); const results=(data.d && data.d.results) || []; if (!results.length) process.exit(1); process.stdout.write(String(results[0].Version || ''));"
+extract_existing_version_by_id() {
+  local iflow_id="$1"
+  node -e "const fs=require('fs'); const id=process.argv[1]; const data=JSON.parse(fs.readFileSync(0,'utf8')); const results=(data.d && data.d.results) || []; const match=results.find(r => r.Id === id); if (!match || !match.Version) process.exit(1); process.stdout.write(String(match.Version));" "$iflow_id"
 }
 
-extract_existing_package() {
-  node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync(0,'utf8')); const results=(data.d && data.d.results) || []; if (!results.length) process.exit(1); process.stdout.write(String(results[0].PackageId || ''));"
+extract_existing_package_by_id() {
+  local iflow_id="$1"
+  node -e "const fs=require('fs'); const id=process.argv[1]; const data=JSON.parse(fs.readFileSync(0,'utf8')); const results=(data.d && data.d.results) || []; const match=results.find(r => r.Id === id); if (!match || !match.PackageId) process.exit(1); process.stdout.write(String(match.PackageId));" "$iflow_id"
 }
 
 require_env NEXUS_REPOSITORY_URL
@@ -120,7 +122,7 @@ if [ -z "$CSRF_TOKEN" ]; then
   exit 1
 fi
 
-QUERY_URL="$BASE_URL/IntegrationDesigntimeArtifacts?\$filter=Id%20eq%20'$CPI_IFLOW_ID'"
+QUERY_URL="$BASE_URL/IntegrationDesigntimeArtifacts"
 CREATE_URL="$BASE_URL/IntegrationDesigntimeArtifacts"
 
 echo "Checking whether iFlow exists..."
@@ -142,8 +144,8 @@ if [ "$HTTP_CODE" != "200" ]; then
   exit 1
 fi
 
-if EXISTING_VERSION="$(cat "$CHECK_BODY" | extract_existing_version 2>/dev/null)"; then
-  EXISTING_PACKAGE_ID="$(cat "$CHECK_BODY" | extract_existing_package 2>/dev/null || true)"
+if EXISTING_VERSION="$(cat "$CHECK_BODY" | extract_existing_version_by_id "$CPI_IFLOW_ID" 2>/dev/null)"; then
+  EXISTING_PACKAGE_ID="$(cat "$CHECK_BODY" | extract_existing_package_by_id "$CPI_IFLOW_ID" 2>/dev/null || true)"
   UPDATE_URL="$BASE_URL/IntegrationDesigntimeArtifacts(Id='$CPI_IFLOW_ID',Version='$EXISTING_VERSION')"
   DEPLOY_URL="$BASE_URL/DeployIntegrationDesigntimeArtifact?Id='$CPI_IFLOW_ID'&Version='$EXISTING_VERSION'"
 
