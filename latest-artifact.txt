@@ -1,1 +1,1 @@
-iflows/IF_Notification_Service/v1.0.8/IF_Notification_Service_v1.0.8.zip
+iflows/IF_Customer_Order_Management/v1.0.11/IF_Customer_Order_Management_v1.0.11.zip
