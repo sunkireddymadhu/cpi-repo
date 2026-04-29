@@ -121,7 +121,7 @@ HTTP_CODE="$(curl --silent --show-error \
 
 if [ "$HTTP_CODE" = "200" ]; then
   echo "iFlow exists. Updating design-time artifact..."
-  curl --fail --show-error --silent \
+  HTTP_CODE="$(curl --silent --show-error \
     -X PUT \
     -c "$COOKIE_JAR" \
     -b "$COOKIE_JAR" \
@@ -130,11 +130,18 @@ if [ "$HTTP_CODE" = "200" ]; then
     -H "Accept: application/json" \
     -H "Content-Type: application/json" \
     -d "{\"Name\":\"$CPI_IFLOW_NAME\",\"ArtifactContent\":\"$ARTIFACT_B64\"}" \
-    "$UPDATE_URL" \
-    -o "$ACTION_BODY"
+    -o "$ACTION_BODY" \
+    -w "%{http_code}" \
+    "$UPDATE_URL" || true)"
+
+  if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+    echo "Update failed. HTTP $HTTP_CODE" >&2
+    cat "$ACTION_BODY" >&2
+    exit 1
+  fi
 elif [ "$HTTP_CODE" = "404" ]; then
   echo "iFlow does not exist. Creating design-time artifact..."
-  curl --fail --show-error --silent \
+  HTTP_CODE="$(curl --silent --show-error \
     -X POST \
     -c "$COOKIE_JAR" \
     -b "$COOKIE_JAR" \
@@ -143,8 +150,15 @@ elif [ "$HTTP_CODE" = "404" ]; then
     -H "Accept: application/json" \
     -H "Content-Type: application/json" \
     -d "{\"Id\":\"$CPI_IFLOW_ID\",\"Name\":\"$CPI_IFLOW_NAME\",\"PackageId\":\"$CPI_PACKAGE_ID\",\"ArtifactContent\":\"$ARTIFACT_B64\"}" \
-    "$CREATE_URL" \
-    -o "$ACTION_BODY"
+    -o "$ACTION_BODY" \
+    -w "%{http_code}" \
+    "$CREATE_URL" || true)"
+
+  if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+    echo "Create failed. HTTP $HTTP_CODE" >&2
+    cat "$ACTION_BODY" >&2
+    exit 1
+  fi
 else
   echo "Failed to check iFlow existence. HTTP $HTTP_CODE" >&2
   cat "$CHECK_BODY" >&2
