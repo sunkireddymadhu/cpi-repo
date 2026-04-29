@@ -1,6 +1,6 @@
 {
-  "artifactId": "IF_Replay_Service",
-  "version": "1.0.5",
+  "artifactId": "IF_Persist_Service",
+  "version": "1.0.7",
   "packageId": "CommonServicesFramework",
-  "requestedAt": "2026-04-29T14:10:46.390Z"
+  "requestedAt": "2026-04-29T18:53:34.207Z"
 }
