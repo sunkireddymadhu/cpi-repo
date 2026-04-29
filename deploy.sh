@@ -1,6 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
+#!/bin/bash
+set -euo pipefail
+
 require_env() {
   local var_name="$1"
   local value="${!var_name:-}"
@@ -44,6 +47,9 @@ echo "Resolved artifact id: $ARTIFACT_ID"
 echo "Resolved artifact version: $ARTIFACT_VERSION"
 echo "Resolved artifact name: $ARTIFACT_NAME"
 echo "Nexus download URL: $NEXUS_DOWNLOAD_URL"
+echo "Configured CPI_IFLOW_ID: $CPI_IFLOW_ID"
+echo "Configured CPI_IFLOW_NAME: $CPI_IFLOW_NAME"
+echo "Configured CPI_PACKAGE_ID: $CPI_PACKAGE_ID"
 
 echo "Downloading artifact from Nexus..."
 curl --fail --show-error --silent --location \
@@ -78,6 +84,7 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 CSRF_HEADERS="$TMP_DIR/csrf-headers.txt"
 CHECK_BODY="$TMP_DIR/check.json"
 ACTION_BODY="$TMP_DIR/action.json"
+ACTION_HEADERS="$TMP_DIR/action-headers.txt"
 DEPLOY_BODY="$TMP_DIR/deploy.txt"
 STATUS_BODY="$TMP_DIR/status.json"
 COOKIE_JAR="$TMP_DIR/cookies.txt"
@@ -119,10 +126,16 @@ HTTP_CODE="$(curl --silent --show-error \
   -w "%{http_code}" \
   "$CHECK_URL" || true)"
 
+echo "Check HTTP code: $HTTP_CODE"
+echo "Check response body:"
+cat "$CHECK_BODY"
+echo
+
 if [ "$HTTP_CODE" = "200" ]; then
   echo "iFlow exists. Updating design-time artifact..."
   HTTP_CODE="$(curl --silent --show-error \
     -X PUT \
+    -D "$ACTION_HEADERS" \
     -c "$COOKIE_JAR" \
     -b "$COOKIE_JAR" \
     -H "Authorization: Bearer $ACCESS_TOKEN" \
@@ -136,6 +149,10 @@ if [ "$HTTP_CODE" = "200" ]; then
 
   if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
     echo "Update failed. HTTP $HTTP_CODE" >&2
+    echo "Update response headers:" >&2
+    cat "$ACTION_HEADERS" >&2
+    echo >&2
+    echo "Update response body:" >&2
     cat "$ACTION_BODY" >&2
     exit 1
   fi
@@ -143,6 +160,7 @@ elif [ "$HTTP_CODE" = "404" ]; then
   echo "iFlow does not exist. Creating design-time artifact..."
   HTTP_CODE="$(curl --silent --show-error \
     -X POST \
+    -D "$ACTION_HEADERS" \
     -c "$COOKIE_JAR" \
     -b "$COOKIE_JAR" \
     -H "Authorization: Bearer $ACCESS_TOKEN" \
@@ -156,6 +174,10 @@ elif [ "$HTTP_CODE" = "404" ]; then
 
   if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
     echo "Create failed. HTTP $HTTP_CODE" >&2
+    echo "Create response headers:" >&2
+    cat "$ACTION_HEADERS" >&2
+    echo >&2
+    echo "Create response body:" >&2
     cat "$ACTION_BODY" >&2
     exit 1
   fi
