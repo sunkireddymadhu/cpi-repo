@@ -1,9 +1,6 @@
 #!/bin/bash
 set -euo pipefail
 
-#!/bin/bash
-set -euo pipefail
-
 require_env() {
   local var_name="$1"
   local value="${!var_name:-}"
@@ -16,6 +13,14 @@ require_env() {
 extract_json_value() {
   local json_key="$1"
   node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync(0,'utf8')); const value=data[process.argv[1]] || ''; if (!value) process.exit(1); process.stdout.write(String(value));" "$json_key"
+}
+
+extract_existing_version() {
+  node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync(0,'utf8')); const results=(data.d && data.d.results) || []; if (!results.length) process.exit(1); process.stdout.write(String(results[0].Version || ''));"
+}
+
+extract_existing_package() {
+  node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync(0,'utf8')); const results=(data.d && data.d.results) || []; if (!results.length) process.exit(1); process.stdout.write(String(results[0].PackageId || ''));"
 }
 
 require_env NEXUS_REPOSITORY_URL
@@ -115,10 +120,8 @@ if [ -z "$CSRF_TOKEN" ]; then
   exit 1
 fi
 
-CHECK_URL="$BASE_URL/IntegrationDesigntimeArtifacts(Id='$CPI_IFLOW_ID',Version='active')"
-UPDATE_URL="$CHECK_URL"
+QUERY_URL="$BASE_URL/IntegrationDesigntimeArtifacts?\$filter=Id%20eq%20'$CPI_IFLOW_ID'"
 CREATE_URL="$BASE_URL/IntegrationDesigntimeArtifacts"
-DEPLOY_URL="$BASE_URL/DeployIntegrationDesigntimeArtifact?Id='$CPI_IFLOW_ID'&Version='active'"
 
 echo "Checking whether iFlow exists..."
 HTTP_CODE="$(curl --silent --show-error \
@@ -126,15 +129,29 @@ HTTP_CODE="$(curl --silent --show-error \
   -H "Accept: application/json" \
   -o "$CHECK_BODY" \
   -w "%{http_code}" \
-  "$CHECK_URL" || true)"
+  "$QUERY_URL" || true)"
 
 echo "Check HTTP code: $HTTP_CODE"
 echo "Check response body:"
 cat "$CHECK_BODY"
 echo
 
-if [ "$HTTP_CODE" = "200" ]; then
-  echo "iFlow exists. Updating design-time artifact..."
+if [ "$HTTP_CODE" != "200" ]; then
+  echo "Failed to query IntegrationDesigntimeArtifacts. HTTP $HTTP_CODE" >&2
+  cat "$CHECK_BODY" >&2
+  exit 1
+fi
+
+if EXISTING_VERSION="$(cat "$CHECK_BODY" | extract_existing_version 2>/dev/null)"; then
+  EXISTING_PACKAGE_ID="$(cat "$CHECK_BODY" | extract_existing_package 2>/dev/null || true)"
+  UPDATE_URL="$BASE_URL/IntegrationDesigntimeArtifacts(Id='$CPI_IFLOW_ID',Version='$EXISTING_VERSION')"
+  DEPLOY_URL="$BASE_URL/DeployIntegrationDesigntimeArtifact?Id='$CPI_IFLOW_ID'&Version='$EXISTING_VERSION'"
+
+  echo "iFlow exists."
+  echo "Existing version: $EXISTING_VERSION"
+  echo "Existing package id: ${EXISTING_PACKAGE_ID:-unknown}"
+  echo "Updating design-time artifact..."
+
   HTTP_CODE="$(curl --silent --show-error \
     -X PUT \
     -D "$ACTION_HEADERS" \
@@ -158,7 +175,9 @@ if [ "$HTTP_CODE" = "200" ]; then
     cat "$ACTION_BODY" >&2
     exit 1
   fi
-elif [ "$HTTP_CODE" = "404" ]; then
+else
+  DEPLOY_URL="$BASE_URL/DeployIntegrationDesigntimeArtifact?Id='$CPI_IFLOW_ID'&Version='active'"
+
   echo "iFlow does not exist. Creating design-time artifact..."
   HTTP_CODE="$(curl --silent --show-error \
     -X POST \
@@ -183,10 +202,6 @@ elif [ "$HTTP_CODE" = "404" ]; then
     cat "$ACTION_BODY" >&2
     exit 1
   fi
-else
-  echo "Failed to check iFlow existence. HTTP $HTTP_CODE" >&2
-  cat "$CHECK_BODY" >&2
-  exit 1
 fi
 
 echo "Triggering deployment..."
