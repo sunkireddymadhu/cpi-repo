@@ -15,9 +15,14 @@ FILE="${RAW_FILE//\\//}"
 [ -f "$FILE" ] || { echo "Artifact file not found: $FILE"; exit 1; }
 
 BASENAME=$(basename "$FILE")
+ARTIFACT_VERSION=$(basename "$(dirname "$FILE")")
+ARTIFACT_VERSION="${ARTIFACT_VERSION#v}"
+ARTIFACT_NAME=$(basename "$(dirname "$(dirname "$FILE")")")
 
 echo "Found artifact from pointer: $BASENAME"
 echo "Artifact path: $FILE"
+echo "Artifact name: $ARTIFACT_NAME"
+echo "Artifact version: $ARTIFACT_VERSION"
 
 echo "Validating ZIP..."
 unzip -t "$FILE" >/dev/null
@@ -28,11 +33,14 @@ cp "$FILE" "dist/$BASENAME"
 [ -n "${NEXUS_PASSWORD:-}" ] || { echo "NEXUS_PASSWORD missing"; exit 1; }
 [ -n "${ARTIFACT_URL:-}" ] || { echo "ARTIFACT_URL missing"; exit 1; }
 
+UPLOAD_URL="${ARTIFACT_URL%/}/$ARTIFACT_NAME/$ARTIFACT_VERSION/$BASENAME"
+
 echo "Uploading to Nexus..."
+echo "Nexus path: $UPLOAD_URL"
 
 curl --fail --show-error --silent \
   -u "admin:$NEXUS_PASSWORD" \
   -T "dist/$BASENAME" \
-  "$ARTIFACT_URL/$BASENAME"
+  "$UPLOAD_URL"
 
 echo "Build completed successfully"
