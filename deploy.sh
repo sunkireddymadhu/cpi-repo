@@ -15,6 +15,10 @@ extract_json_value() {
   node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync(0,'utf8')); const value=data[process.argv[1]] || ''; if (!value) process.exit(1); process.stdout.write(String(value));" "$json_key"
 }
 
+extract_incident_state() {
+  node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync(0,'utf8')); const result=(data.result && data.result[0]) || null; if (!result) process.exit(1); process.stdout.write(String(result.state_display || result.state || ''));"
+}
+
 require_env NEXUS_REPOSITORY_URL
 require_env NEXUS_USER
 require_env NEXUS_PASSWORD
@@ -22,6 +26,9 @@ require_env CPI_TOKEN_URL
 require_env CPI_CLIENT_ID
 require_env CPI_CLIENT_SECRET
 require_env CPI_RUNTIME_URL
+require_env SNOW_INSTANCE_URL
+require_env SNOW_USERNAME
+require_env SNOW_PASSWORD
 
 REQUEST_FILE="deploy-request.json"
 
@@ -30,13 +37,18 @@ REQUEST_FILE="deploy-request.json"
 ARTIFACT_ID="$(cat "$REQUEST_FILE" | extract_json_value artifactId)"
 ARTIFACT_VERSION="$(cat "$REQUEST_FILE" | extract_json_value version)"
 CPI_PACKAGE_ID="$(cat "$REQUEST_FILE" | extract_json_value packageId)"
+INCIDENT_ID="$(cat "$REQUEST_FILE" | extract_json_value incidentId)"
 
 [ -n "$ARTIFACT_ID" ] || { echo "artifactId missing in deploy-request.json"; exit 1; }
 [ -n "$ARTIFACT_VERSION" ] || { echo "version missing in deploy-request.json"; exit 1; }
 [ -n "$CPI_PACKAGE_ID" ] || { echo "packageId missing in deploy-request.json"; exit 1; }
+[ -n "$INCIDENT_ID" ] || { echo "incidentId missing in deploy-request.json"; exit 1; }
 
 CPI_IFLOW_ID="$ARTIFACT_ID"
 CPI_IFLOW_NAME="$ARTIFACT_ID"
+
+SNOW_INCIDENT_TABLE="${SNOW_INCIDENT_TABLE:-incident}"
+SNOW_REQUIRED_STATE="${SNOW_REQUIRED_STATE:-In Progress}"
 
 ARTIFACT_NAME="${ARTIFACT_ID}_v${ARTIFACT_VERSION}.zip"
 ARTIFACT_FILE="$ARTIFACT_NAME"
@@ -46,6 +58,7 @@ echo "Resolved artifact id: $ARTIFACT_ID"
 echo "Resolved artifact version: $ARTIFACT_VERSION"
 echo "Resolved artifact name: $ARTIFACT_NAME"
 echo "Resolved package id: $CPI_PACKAGE_ID"
+echo "Resolved incident id: $INCIDENT_ID"
 echo "Resolved iflow id: $CPI_IFLOW_ID"
 echo "Resolved iflow name: $CPI_IFLOW_NAME"
 echo "Nexus download URL: $NEXUS_DOWNLOAD_URL"
@@ -87,6 +100,42 @@ ACTION_HEADERS="$TMP_DIR/action-headers.txt"
 DEPLOY_BODY="$TMP_DIR/deploy.txt"
 STATUS_BODY="$TMP_DIR/status.json"
 COOKIE_JAR="$TMP_DIR/cookies.txt"
+SNOW_BODY="$TMP_DIR/snow.json"
+
+echo "Validating incident in ServiceNow..."
+SNOW_URL="${SNOW_INSTANCE_URL%/}/api/now/table/${SNOW_INCIDENT_TABLE}?sysparm_query=number=${INCIDENT_ID}&sysparm_limit=1&sysparm_fields=number,state,state_display"
+
+HTTP_CODE="$(curl --silent --show-error \
+  -u "$SNOW_USERNAME:$SNOW_PASSWORD" \
+  -H "Accept: application/json" \
+  -o "$SNOW_BODY" \
+  -w "%{http_code}" \
+  "$SNOW_URL" || true)"
+
+echo "ServiceNow check HTTP code: $HTTP_CODE"
+
+if [ "$HTTP_CODE" != "200" ]; then
+  echo "Failed to query ServiceNow incident. HTTP $HTTP_CODE" >&2
+  cat "$SNOW_BODY" >&2
+  exit 1
+fi
+
+INC_STATE="$(cat "$SNOW_BODY" | extract_incident_state 2>/dev/null || true)"
+
+if [ -z "$INC_STATE" ]; then
+  echo "Incident not found: $INCIDENT_ID" >&2
+  cat "$SNOW_BODY" >&2
+  exit 1
+fi
+
+echo "Incident state: $INC_STATE"
+
+if [ "$INC_STATE" != "$SNOW_REQUIRED_STATE" ]; then
+  echo "Incident $INCIDENT_ID is not in required state '$SNOW_REQUIRED_STATE'." >&2
+  exit 1
+fi
+
+echo "Incident validation passed."
 
 echo "Fetching CSRF token..."
 CSRF_URL="$BASE_URL/IntegrationDesigntimeArtifacts?\$top=1"
