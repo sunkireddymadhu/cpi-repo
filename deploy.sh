@@ -16,11 +16,7 @@ extract_json_value() {
 }
 
 extract_incident_state() {
-<<<<<<< Updated upstream
-  node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync(0,'utf8')); const result=(data.result && data.result[0]) || null; if (!result) process.exit(1); process.stdout.write(String(result.state_display || result.state || ''));"
-=======
   node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync(0,'utf8')); const result=(data.result && data.result[0]) || null; if (!result) process.exit(1); process.stdout.write(String(result.state || ''));"
->>>>>>> Stashed changes
 }
 
 require_env NEXUS_REPOSITORY_URL
@@ -107,15 +103,9 @@ COOKIE_JAR="$TMP_DIR/cookies.txt"
 SNOW_BODY="$TMP_DIR/snow.json"
 
 echo "Validating incident in ServiceNow..."
-<<<<<<< Updated upstream
-SNOW_URL="${SNOW_INSTANCE_URL%/}/api/now/table/${SNOW_INCIDENT_TABLE}?sysparm_query=number=${INCIDENT_ID}&sysparm_limit=1&sysparm_fields=number,state,state_display"
-
-HTTP_CODE="$(curl --silent --show-error \
-=======
 SNOW_URL="${SNOW_INSTANCE_URL%/}/api/now/table/${SNOW_INCIDENT_TABLE}?sysparm_query=number=${INCIDENT_ID}&sysparm_limit=1&sysparm_fields=number,state&sysparm_display_value=true"
 
 HTTP_CODE="$(curl --silent --show-error --location \
->>>>>>> Stashed changes
   -u "$SNOW_USERNAME:$SNOW_PASSWORD" \
   -H "Accept: application/json" \
   -o "$SNOW_BODY" \
