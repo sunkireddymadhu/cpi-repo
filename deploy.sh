@@ -1,5 +1,8 @@
 #!/bin/bash
 set -euo pipefail
+echo "Debugging env presence..."
+env | grep -i nexus || true
+env | grep -i cpi || true
 
 require_env() {
   local var_name="$1"
