@@ -22,6 +22,8 @@ extract_incident_state() {
   node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync(0,'utf8')); const result=(data.result && data.result[0]) || null; if (!result) process.exit(1); process.stdout.write(String(result.state || ''));"
 }
 
+require_env NEXUS_REPOSITORY_URL
+require_env NEXUS_USER
 require_env NEXUS_PASSWORD
 require_env CPI_TOKEN_URL
 require_env CPI_CLIENT_ID
