@@ -4,13 +4,34 @@ echo "Debugging env presence..."
 env | grep -i nexus || true
 env | grep -i cpi || true
 
+get_env_value() {
+  local var_name="$1"
+  local lower_name
+  lower_name="$(printf '%s' "$var_name" | tr '[:upper:]' '[:lower:]')"
+
+  if [ -n "${!var_name:-}" ]; then
+    printf '%s' "${!var_name}"
+    return 0
+  fi
+
+  if [ -n "${!lower_name:-}" ]; then
+    printf '%s' "${!lower_name}"
+    return 0
+  fi
+
+  return 1
+}
+
 require_env() {
   local var_name="$1"
-  local value="${!var_name:-}"
-  if [ -z "$value" ]; then
+  local value
+
+  if ! value="$(get_env_value "$var_name")"; then
     echo "Missing required environment variable: $var_name" >&2
     exit 1
   fi
+
+  export "$var_name=$value"
 }
 
 extract_json_value() {
