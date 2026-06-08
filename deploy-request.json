@@ -1,7 +1,7 @@
 {
-  "artifactId": "IF_Persist_Service",
-  "version": "1.0.7",
+  "artifactId": "IF_SelectiveMessage_Replay",
+  "version": "1.0.4",
   "packageId": "CommonServicesFramework",
   "incidentId": "INC0009009",
-  "requestedAt": "2026-06-06T23:23:49.235Z"
+  "requestedAt": "2026-06-08T15:12:10.865Z"
 }
